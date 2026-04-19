@@ -525,7 +525,6 @@ resource "aws_sqs_queue" "coursera_queue" {
   message_retention_seconds  = 86400
   receive_wait_time_seconds  = 10
   visibility_timeout_seconds = 180
-  delay_seconds              = 90
 
   tags = {
     Name = var.tag-name
