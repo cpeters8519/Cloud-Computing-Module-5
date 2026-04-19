@@ -133,7 +133,7 @@ resource "aws_route_table_association" "subnets" {
   route_table_id = aws_route_table.example.id
 }
 
-# Make this the main route table for the VPC
+# main route table for the VPC
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/main_route_table_association
 resource "aws_main_route_table_association" "a" {
   vpc_id         = aws_vpc.project.id
@@ -150,6 +150,42 @@ resource "aws_iam_instance_profile" "coursera_profile" {
   role = aws_iam_role.role.name
 }
 
+resource "aws_iam_role_policy" "sqs_fullaccess_policy" {
+  name = "sqs_fullaccess_policy"
+  role = aws_iam_role.role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:*",
+          "secretsmanager:*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_instance" "backend" {
+  ami                    = var.imageid
+  instance_type          = var.instance-type
+  key_name               = var.key-name
+  subnet_id              = aws_subnet.private[0].id
+  vpc_security_group_ids = [aws_security_group.allow_http.id]
+
+  iam_instance_profile = aws_iam_instance_profile.coursera_profile.name
+
+  user_data = filebase64("./install-env.sh")
+
+  tags = {
+    Name = var.tag-name
+    Type = "backend"
+  }
+}
+
 # Trust policy - allows EC2 to assume this role
 data "aws_iam_policy_document" "assume_role" {
   statement {
@@ -164,7 +200,7 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
-# The IAM role itself
+# IAM
 resource "aws_iam_role" "role" {
   name               = "project_role"
   path               = "/"
@@ -488,7 +524,8 @@ resource "aws_sqs_queue" "coursera_queue" {
   delay_seconds              = 90
   message_retention_seconds  = 86400
   receive_wait_time_seconds  = 10
-  visibility_timeout_seconds = 300
+  visibility_timeout_seconds = 180
+  delay_seconds              = 90
 
   tags = {
     Name = var.tag-name
